@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>拉密 Rummikub · 经典规则 · 人机对战</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,'Segoe UI','PingFang SC','Microsoft YaHei',sans-serif;background:#F4F2EC;color:#2C2C2A;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:14px}
+.wrap{width:100%;max-width:1080px}
+header{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+h1{font-size:17px;font-weight:600}
+.pill{background:#fff;border:1px solid #DDD8CA;border-radius:999px;padding:4px 12px;font-size:12px;color:#6B6860;white-space:nowrap}
+button{font:inherit;font-size:13px;background:#fff;border:1px solid #CFC9BA;border-radius:8px;padding:7px 14px;cursor:pointer;color:#2C2C2A}
+button:hover:not(:disabled){background:#EFEDE4}
+button:disabled{opacity:.45;cursor:default}
+button.primary{background:#534AB7;border-color:#534AB7;color:#fff}
+button.primary:hover:not(:disabled){background:#443CA0}
+section{margin-bottom:12px}
+#playersBar{display:flex;gap:8px;align-items:center;font-size:13px;flex-wrap:wrap}
+.pcard{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #E0DBCD;border-radius:10px;padding:6px 12px}
+.pcard.active{border:2px solid #534AB7;background:#F3F1FB}
+.pcard .pname{font-weight:600;font-size:13px}
+.pcard .pmeta{font-size:11px;color:#8A857A}
+#tableArea{background:#E9E4D3;border:1px solid #D8D2C0;border-radius:12px;padding:12px;min-height:180px;display:flex;flex-wrap:wrap;gap:12px;align-content:flex-start}
+.group{display:flex;gap:4px;padding:6px;border-radius:8px;background:rgba(255,255,255,.55);border:1px solid transparent;align-items:center}
+.group.invalid{border-color:#C64B44;background:#FBEDEB}
+.gscore{font-size:11px;color:#8A857A;margin-left:6px;white-space:nowrap;align-self:flex-end;padding-bottom:4px}
+#newgroup{border:2px dashed #BDB6A4;border-radius:8px;color:#9B958A;font-size:12px;display:flex;align-items:center;justify-content:center;padding:0 14px;height:76px}
+.tile{width:46px;height:62px;border-radius:6px;background:#FCFAF3;border:1px solid #D9D3C2;box-shadow:inset 0 -3px 0 rgba(0,0,0,.05);position:relative;user-select:none;-webkit-user-select:none;touch-action:none;cursor:grab;flex:0 0 auto;display:flex;align-items:center;justify-content:center}
+.tile .n{font-size:23px;font-weight:700;font-family:Georgia,'Times New Roman',serif;color:var(--c)}
+.tile.red{--c:#BF3B2B}.tile.blue{--c:#2B5D8F}.tile.black{--c:#333333}.tile.orange{--c:#D07A16}
+.tile.jokerWarm{background:linear-gradient(135deg,#BF3B2B 49.5%,#D07A16 50.5%);border-color:#A85A2C;--c:#fff}
+.tile.jokerCold{background:linear-gradient(135deg,#2B5D8F 49.5%,#333333 50.5%);border-color:#41506B;--c:#fff}
+.tile .pip{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:7px;height:7px;border-radius:50%;background:var(--c);opacity:.7}
+.tile.jokerWarm .n,.tile.jokerCold .n{font-size:26px;text-shadow:0 1px 2px rgba(0,0,0,.3)}
+.tile.jokerWarm .rv,.tile.jokerCold .rv{color:rgba(255,255,255,.95);text-shadow:0 1px 2px rgba(0,0,0,.35)}
+.tile .rv{position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:11px;color:#8A857A}
+.tile.fresh::after{content:'';position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%;background:#3B6D11;opacity:.85}
+.drag-src{opacity:.35}
+.ghost{position:fixed;z-index:999;pointer-events:none;transform:rotate(-4deg) scale(1.06)}
+.drophint{outline:2.5px dashed #534AB7;outline-offset:2px}
+#controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+#turnBanner{font-weight:600;font-size:14px;margin-right:6px}
+#turnBanner.ai{color:#8A6D1D}
+#scoreInfo{font-size:12px;color:#6B6860;margin-left:auto}
+#rackPanel{background:#fff;border:1px solid #E0DBCD;border-radius:12px;padding:10px 12px}
+.rackhead{display:flex;align-items:center;gap:10px;margin-bottom:8px;font-size:13px}
+.rackhead .st{font-size:12px;color:#8A857A}
+#rack{background:#57503F;border-radius:10px;padding:8px;display:flex;gap:5px;overflow-x:auto;min-height:80px;align-items:center}
+#logPanel{background:#fff;border:1px solid #E0DBCD;border-radius:12px;padding:10px 12px}
+#logPanel h3{font-size:12px;color:#8A857A;font-weight:600;margin-bottom:6px}
+#log{list-style:none;font-size:12px;color:#6B6860;max-height:104px;overflow:auto}
+#log li{padding:2px 0;border-bottom:1px dashed #EAE6DA}
+#toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:#33302A;color:#fff;font-size:13px;padding:9px 18px;border-radius:999px;opacity:0;transition:opacity .25s;pointer-events:none;z-index:1000;max-width:80vw}
+#toast.show{opacity:1}
+.overlay{position:fixed;inset:0;background:rgba(40,36,30,.45);display:flex;align-items:center;justify-content:center;z-index:998}
+.card{background:#fff;border-radius:14px;padding:26px 30px;max-width:440px;width:90%;text-align:center}
+.card h2{font-size:18px;margin-bottom:10px}
+.card p{font-size:13px;color:#6B6860;line-height:1.7;margin-bottom:16px}
+#ovText{white-space:pre-line}
+#rulesModal .card{text-align:left;max-height:82vh;overflow:auto}
+#rulesModal h4{font-size:13px;margin:12px 0 4px;color:#2C2C2A}
+#rulesModal p,#rulesModal li{font-size:13px;color:#55524B;line-height:1.65;margin:2px 0}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>拉密 Rummikub</h1>
+    <span class="pill" id="poolCount">牌池 0</span>
+    <span style="margin-left:auto"></span>
+    <button id="btnNew">新对局</button>
+    <button id="btnRules">规则</button>
+    <button id="btnSort">整理牌架</button>
+  </header>
+
+  <section>
+    <div id="playersBar"></div>
+  </section>
+
+  <section>
+    <div id="tableArea">
+      <div id="groups" style="display:contents"></div>
+      <div id="newgroup">＋ 拖到此处<br>另起牌组</div>
+    </div>
+  </section>
+
+  <section id="controls">
+    <span id="turnBanner">你的回合</span>
+    <button id="btnDraw">摸牌</button>
+    <button id="btnReset">重置本轮</button>
+    <button id="btnEnd" class="primary">结束回合</button>
+    <span id="scoreInfo">未破冰 · 本轮已下 0 / 30 分</span>
+  </section>
+
+  <section id="rackPanel">
+    <div class="rackhead">
+      <strong>你的牌架</strong>
+      <span class="st" id="youMeld">未破冰（首次下牌需 ≥30 分）</span>
+      <span class="st">拖动排序 · 拖上桌面出牌 · 绿点＝本轮新下的牌</span>
+    </div>
+    <div id="rack"></div>
+  </section>
+
+  <section id="logPanel">
+    <h3>对局记录</h3>
+    <ul id="log"></ul>
+  </section>
+</div>
+
+<div id="toast"></div>
+
+<div class="overlay hidden" id="setupOverlay">
+  <div class="card">
+    <h2>开局设置</h2>
+    <p>选择几位电脑玩家（你永远先手）</p>
+    <div style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap">
+      <button data-ai="1">1 台电脑</button>
+      <button data-ai="2">2 台电脑</button>
+      <button data-ai="3" class="primary">3 台电脑</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="endOverlay">
+  <div class="card">
+    <h2 id="ovTitle"></h2>
+    <p id="ovText"></p>
+    <div style="display:flex;gap:8px;justify-content:center">
+      <button id="btnAgain">再来一局（同人数）</button>
+      <button class="primary" id="btnAgainSetup">更改人数</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay hidden" id="rulesModal">
+  <div class="card">
+    <h2>拉密规则速览</h2>
+    <h4>目标</h4>
+    <p>最先打完手中全部 14 张牌者获胜。</p>
+    <h4>牌</h4>
+    <p>1–13 四色（红/蓝/黑/橙）各两套，共 104 张，加 2 张百搭：<b>暖色百搭</b>（红橙拼色 ★）只能当作红色或橙色的牌；<b>冷色百搭</b>（蓝黑拼色 ★）只能当作蓝色或黑色的牌。百搭按其所代表的牌计分。</p>
+    <h4>有效牌组（≥3 张）</h4>
+    <ul>
+      <li><b>顺子</b>：同色连续数字，如 蓝4-蓝5-蓝6。</li>
+      <li><b>刻子</b>：同数字不同色，如 红9-蓝9-黑9。</li>
+    </ul>
+    <h4>破冰</h4>
+    <p>首次下牌必须从手牌摆出总分 ≥30 的牌组（数字即分值，百搭按其所代表的牌计分）。破冰前不能动桌面上已有的牌。</p>
+    <h4>破冰后</h4>
+    <p>可以自由拆分、重组、抽取桌面牌组中的牌，也可以把自己的牌补进任何牌组——但回合结束时，桌面所有牌组必须全部有效。桌面上已打出的牌不能收回牌架（可用「重置本轮」撤销本轮全部改动）。</p>
+    <h4>回合</h4>
+    <ul>
+      <li>按座位顺序轮流行动。出牌后点「结束回合」；不想出或出不了，点「摸牌」并结束回合。</li>
+      <li>牌池摸完后，全员连续过牌则按剩余手牌分值（百搭算 30 分）排名，少者胜。</li>
+    </ul>
+    <p style="margin-top:12px"><button id="btnCloseRules">知道了</button></p>
+  </div>
+</div>
+
+<script>
+'use strict';
+const COLORS=['red','blue','black','orange'];
+const COLCHAR={red:'红',blue:'蓝',black:'黑',orange:'橙'};
+const JOKER_FAMILY={jokerWarm:['red','orange'],jokerCold:['blue','black']};
+const isJoker=t=>t.color==='jokerWarm'||t.color==='jokerCold';
+const AI_NAMES=['电脑·甲','电脑·乙','电脑·丙'];
+const el=s=>document.querySelector(s);
+const els=s=>[...document.querySelectorAll(s)];
+let TID=0,GID=0;
+const T={};
+function mkTile(color,num){const t={id:++TID,color,num};T[t.id]=t;return t;}
+function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
+function combinations(arr,k){
+  const out=[],rec=(start,cur)=>{
+    if(cur.length===k){out.push(cur.slice());return;}
+    for(let i=start;i<=arr.length-(k-cur.length);i++){cur.push(arr[i]);rec(i+1,cur);cur.pop();}
+  };rec(0,[]);return out;
+}
+
+let S=null;
+const me=()=>S.players[0];
+const cur=()=>S.players[S.turnIdx];
+const myTurn=()=>!S.over&&S.turnIdx===0;
+
+function newGame(aiCount){
+  const deck=[];
+  COLORS.forEach(c=>{for(let n=1;n<=13;n++){deck.push(mkTile(c,n));deck.push(mkTile(c,n));}});
+  deck.push(mkTile('jokerWarm',0));deck.push(mkTile('jokerCold',0));
+  shuffle(deck);
+  const players=[{name:'你',rack:deck.splice(0,14),melded:false,human:true}];
+  for(let i=0;i<aiCount;i++)players.push({name:AI_NAMES[i],rack:deck.splice(0,14),melded:false});
+  S={pool:deck,players,table:[],turnIdx:0,pass:0,over:false,placed:new Set(),snap:null,logs:[]};
+  snapshot();
+  log(`新对局开始（你 + ${aiCount} 台电脑），你先手。破冰需要 ≥30 分。`);
+  render();
+}
+
+function log(msg){
+  S.logs.unshift(msg);if(S.logs.length>40)S.logs.pop();
+  const ul=el('#log');ul.innerHTML='';
+  S.logs.slice(0,12).forEach(m=>{const li=document.createElement('li');li.textContent=m;ul.appendChild(li);});
+}
+let toastTimer=null;
+function toast(msg){
+  const t=el('#toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2200);
+}
+
+function analyzeGroup(tiles){
+  const res={valid:false,score:0,resolved:null,resolvedCol:null};
+  if(!tiles||tiles.length<3)return res;
+  const jk=tiles.filter(isJoker);
+  const real=tiles.filter(t=>!isJoker(t));
+  let best=null;
+  // 刻子：同号异色；百搭只能顶替其色系内的空位颜色
+  if(real.length>0&&real.every(t=>t.num===real[0].num)){
+    const cols=real.map(t=>t.color);
+    if(new Set(cols).size===cols.length&&real.length+jk.length<=4){
+      const avail=COLORS.filter(c=>!cols.includes(c));
+      const assign={};let ok=true;
+      for(const j of jk){
+        const pick=avail.find(c=>JOKER_FAMILY[j.color].includes(c));
+        if(pick==null){ok=false;break;}
+        assign[j.id]=pick;avail.splice(avail.indexOf(pick),1);
+      }
+      if(ok){
+        const resolved={},resolvedCol={};
+        tiles.forEach(t=>resolved[t.id]=real[0].num);
+        jk.forEach(j=>resolvedCol[j.id]=assign[j.id]);
+        best={score:real[0].num*tiles.length,resolved,resolvedCol};
+      }
+    }
+  }
+  // 顺子：同色连号；百搭色系必须包含整组的颜色
+  if(real.length>0&&new Set(real.map(t=>t.color)).size===1){
+    const runColor=real[0].color;
+    if(jk.every(j=>JOKER_FAMILY[j.color].includes(runColor))){
+      const nums=real.map(t=>t.num);
+      if(new Set(nums).size===nums.length){
+        nums.sort((a,b)=>a-b);
+        const lo=nums[0],hi=nums[nums.length-1];
+        const gaps=(hi-lo+1)-nums.length,extra=jk.length-gaps;
+        if(extra>=0&&(lo-1)+(13-hi)>=extra){
+          const after=Math.min(extra,13-hi),before=extra-after;
+          const low=lo-before,high=hi+after;
+          const resolved={};
+          const realByNum={};real.forEach(t=>realByNum[t.num]=t);
+          for(let v=low;v<=high;v++)if(realByNum[v])resolved[realByNum[v].id]=v;
+          const missing=[];for(let v=low;v<=high;v++)if(!realByNum[v])missing.push(v);
+          jk.forEach((t,i)=>resolved[t.id]=missing[i]);
+          const score=(low+high)*tiles.length/2;
+          if(!best||score>best.score)best={score,resolved};
+        }
+      }
+    }
+  }
+  if(best){res.valid=true;res.score=best.score;res.resolved=best.resolved;if(best.resolvedCol)res.resolvedCol=best.resolvedCol;}
+  return res;
+}
+
+function groupById(id){return S.table.find(g=>g.id===id);}
+function groupIsNew(id){const g=groupById(id);return !!g&&g.tiles.length>0&&g.tiles.every(t=>S.placed.has(t.id));}
+function placedScoreThisTurn(){
+  let s=0;S.table.forEach(g=>{if(g.tiles.length>0&&g.tiles.every(t=>S.placed.has(t.id)))s+=analyzeGroup(g.tiles).score;});
+  return s;
+}
+function rackScore(rack){return rack.reduce((s,t)=>s+(isJoker(t)?30:t.num),0);}
+
+function snapshot(){
+  S.snap={rack:me().rack.map(t=>t.id),melded:me().melded,
+    table:S.table.map(g=>({id:g.id,tiles:g.tiles.map(t=>t.id)})),placed:[...S.placed]};
+}
+function resetTurn(){
+  if(!S.snap||S.over)return;
+  me().rack=S.snap.rack.map(id=>T[id]);
+  me().melded=S.snap.melded;
+  S.table=S.snap.table.map(g=>({id:g.id,tiles:g.tiles.map(id=>T[id])}));
+  S.placed=new Set(S.snap.placed);
+  log('你重置了本轮改动');
+  render();
+}
+
+function tileEl(t,loc,rv,fresh,rvCol){
+  const d=document.createElement('div');
+  d.className='tile '+t.color+(fresh?' fresh':'');
+  d.dataset.tileId=t.id;d.dataset.from=loc.from;
+  if(loc.from==='table'){d.dataset.gid=loc.gid;d.dataset.index=loc.index;}
+  else d.dataset.index=loc.index;
+  let html=isJoker(t)?'<span class="n">★</span>':`<span class="n">${t.num}</span><span class="pip"></span>`;
+  if(rv!=null){
+    const cc=rvCol?COLCHAR[rvCol]||'':'';
+    html+=`<span class="rv">${cc?'='+cc+rv:'='+rv}</span>`;
+  }
+  d.innerHTML=html;
+  return d;
+}
+
+function render(){
+  el('#poolCount').textContent='牌池 '+S.pool.length;
+  const bar=el('#playersBar');bar.innerHTML='';
+  S.players.forEach((p,i)=>{
+    const c=document.createElement('div');
+    c.className='pcard'+((i===S.turnIdx&&!S.over)?' active':'');
+    c.innerHTML=`<span class="pname">${p.name}</span><span class="pmeta">手牌 ${p.rack.length} · ${p.melded?'已破冰':'未破冰'}</span>`;
+    bar.appendChild(c);
+  });
+  el('#youMeld').textContent=me().melded?'已破冰':'未破冰（首次下牌需 ≥30 分）';
+  el('#turnBanner').textContent=S.over?'对局结束':(myTurn()?'你的回合':cur().name+' 回合…');
+  el('#turnBanner').className=myTurn()?'':'ai';
+  el('#btnDraw').disabled=!myTurn();
+  el('#btnEnd').disabled=!myTurn();
+  el('#btnReset').disabled=!myTurn();
+  el('#btnSort').disabled=!myTurn();
+  const tElRoot=el('#groups');tElRoot.innerHTML='';
+  S.table.forEach(g=>{
+    const a=analyzeGroup(g.tiles);
+    const div=document.createElement('div');
+    div.className='group'+(a.valid?'':' invalid');
+    div.dataset.gid=g.id;
+    g.tiles.forEach((t,i)=>{
+      const rv=(a.valid&&isJoker(t))?(a.resolved?a.resolved[t.id]:null):null;
+      const rvCol=(a.valid&&isJoker(t)&&a.resolvedCol)?a.resolvedCol[t.id]:null;
+      div.appendChild(tileEl(t,{from:'table',gid:g.id,index:i},rv,S.placed.has(t.id),rvCol));
+    });
+    const tag=document.createElement('span');tag.className='gscore';
+    tag.textContent=a.valid?(a.score+' 分'):(g.tiles.length<3?'至少 3 张':'无效');
+    div.appendChild(tag);
+    tElRoot.appendChild(div);
+  });
+  el('#newgroup').style.display=S.over?'none':'flex';
+  const rEl=el('#rack');rEl.innerHTML='';
+  me().rack.forEach((t,i)=>rEl.appendChild(tileEl(t,{from:'rack',index:i})));
+  const pts=placedScoreThisTurn();
+  el('#scoreInfo').textContent=me().melded
+    ?`已破冰 · 本轮已下 ${S.placed.size} 张牌`
+    :`未破冰 · 本轮已下 ${pts} / 30 分`;
+}
+
+let dragCtx=null,hintEl=null;
+function clearHint(){if(hintEl){hintEl.classList.remove('drophint');hintEl=null;}}
+function targetFromPoint(x,y){
+  const e=document.elementFromPoint(x,y);if(!e)return null;
+  const tile=e.closest('.tile');
+  if(tile&&tile.dataset.from==='table')return{kind:'insertGroup',gid:+tile.dataset.gid,beforeIndex:+tile.dataset.index,hint:tile};
+  if(tile&&tile.dataset.from==='rack')return{kind:'insertRack',index:+tile.dataset.index,hint:tile};
+  const g=e.closest('.group');if(g)return{kind:'appendGroup',gid:+g.dataset.gid,hint:g};
+  if(e.closest('#newgroup'))return{kind:'newGroup',hint:el('#newgroup')};
+  if(e.closest('#tableArea'))return{kind:'newGroup',hint:el('#newgroup')};
+  if(e.closest('#rack'))return{kind:'appendRack',hint:el('#rack')};
+  return null;
+}
+document.addEventListener('pointerdown',e=>{
+  const tel=e.target.closest('.tile');if(!tel)return;
+  if(!S||S.over||!myTurn())return;
+  dragCtx={tileId:+tel.dataset.tileId,from:tel.dataset.from,gid:tel.dataset.gid?+tel.dataset.gid:null,
+    index:+tel.dataset.index,x:e.clientX,y:e.clientY,started:false,el:tel,ghost:null};
+  try{tel.setPointerCapture(e.pointerId);}catch(_){}
+  e.preventDefault();
+});
+document.addEventListener('pointermove',e=>{
+  if(!dragCtx)return;const c=dragCtx;
+  if(!c.started){
+    if(Math.hypot(e.clientX-c.x,e.clientY-c.y)<7)return;
+    c.started=true;c.el.classList.add('drag-src');
+    const g=c.el.cloneNode(true);g.classList.add('ghost');g.classList.remove('drag-src');
+    document.body.appendChild(g);c.ghost=g;
+  }
+  c.ghost.style.left=(e.clientX-23)+'px';c.ghost.style.top=(e.clientY-31)+'px';
+  const t=targetFromPoint(e.clientX,e.clientY);
+  if(t&&t.hint!==hintEl){clearHint();if(t.hint){t.hint.classList.add('drophint');hintEl=t.hint;}}
+  else if(!t)clearHint();
+});
+function endDrag(e){
+  if(!dragCtx)return;const c=dragCtx;dragCtx=null;clearHint();
+  const dst=e?targetFromPoint(e.clientX,e.clientY):null;
+  if(c.ghost)c.ghost.remove();
+  c.el.classList.remove('drag-src');
+  if(c.started&&dst)applyMove(c,dst);
+}
+document.addEventListener('pointerup',endDrag);
+document.addEventListener('pointercancel',()=>endDrag(null));
+
+function checkMove(c,dst){
+  if(S.over)return '对局已结束';
+  if(!myTurn())return '现在不是你的回合';
+  if(dst.kind==='appendRack'||dst.kind==='insertRack'){
+    if(c.from==='table')return '桌面上的牌不能收回牌架（可用「重置本轮」撤销）';
+    return null;
+  }
+  if(!me().melded){
+    const srcNew=c.from==='table'?groupIsNew(c.gid):true;
+    if(!srcNew)return '破冰前不能动桌面上的旧牌组';
+    if((dst.kind==='appendGroup'||dst.kind==='insertGroup')&&!groupIsNew(dst.gid))
+      return '破冰前只能把牌放进自己新下的牌组';
+  }
+  return null;
+}
+
+function applyMove(c,dst){
+  const tile=T[c.tileId];if(!tile)return;
+  const err=checkMove(c,dst);if(err){toast(err);return;}
+  let refId=null,refTile=null,refIsSelf=false;
+  if(dst.kind==='insertGroup'){
+    const g=groupById(dst.gid);
+    if(g){const rt=g.tiles[Math.min(dst.beforeIndex,g.tiles.length-1)];
+      if(rt){refId=rt.id;refIsSelf=(rt.id===tile.id);}}
+  }
+  if(dst.kind==='insertRack'){
+    refTile=me().rack[Math.min(dst.index,me().rack.length-1)]||null;
+    refIsSelf=(refTile===tile);
+  }
+  if(c.from==='table'){
+    const g=groupById(c.gid);
+    if(g){const i=g.tiles.findIndex(t=>t.id===tile.id);if(i>=0)g.tiles.splice(i,1);}
+  }else{
+    const i=me().rack.findIndex(t=>t.id===tile.id);if(i>=0)me().rack.splice(i,1);
+  }
+  if(dst.kind==='newGroup'){
+    S.table.push({id:++GID,tiles:[tile]});
+    if(c.from==='rack')S.placed.add(tile.id);
+  }else if(dst.kind==='appendGroup'){
+    let g=groupById(dst.gid);
+    if(!g){g={id:dst.gid,tiles:[]};S.table.push(g);}
+    g.tiles.push(tile);
+    if(c.from==='rack')S.placed.add(tile.id);
+  }else if(dst.kind==='insertGroup'){
+    let g=groupById(dst.gid);
+    if(!g){g={id:dst.gid,tiles:[]};S.table.push(g);}
+    let i;
+    if(refIsSelf&&c.gid===dst.gid)i=c.index;
+    else if(refIsSelf)i=0;
+    else{i=refId!=null?g.tiles.findIndex(t=>t.id===refId):g.tiles.length;if(i<0)i=g.tiles.length;}
+    g.tiles.splice(Math.min(i,g.tiles.length),0,tile);
+    if(c.from==='rack')S.placed.add(tile.id);
+  }else{
+    let i=me().rack.length;
+    if(refIsSelf)i=c.index;
+    else if(refTile)i=me().rack.indexOf(refTile);
+    if(i<0)i=me().rack.length;
+    me().rack.splice(Math.min(i,me().rack.length),0,tile);
+  }
+  S.table=S.table.filter(g=>g.tiles.length>0);
+  render();
+}
+
+function endTurn(){
+  if(!S||S.over||!myTurn())return;
+  const bad=S.table.filter(g=>!analyzeGroup(g.tiles).valid);
+  if(bad.length){toast('桌面有无效牌组（红框），请调整或重置本轮');return;}
+  if(S.placed.size===0){
+    if(S.pool.length){me().rack.push(S.pool.pop());log('你未出牌，摸了一张牌');}
+    else log('牌池已空，你过牌');
+    S.pass++;nextTurn();return;
+  }
+  if(!me().melded){
+    const pts=placedScoreThisTurn();
+    if(pts<30){toast(`破冰需要至少 30 分，当前 ${pts} 分`);return;}
+    me().melded=true;
+    log(`你破冰成功（${pts} 分）`);
+  }
+  if(me().rack.length===0){render();win(me());return;}
+  S.pass=0;nextTurn();
+}
+function nextTurn(){
+  if(S.over)return;
+  S.turnIdx=(S.turnIdx+1)%S.players.length;
+  if(S.players[S.turnIdx].human){
+    S.placed=new Set();
+    snapshot();
+    render();
+  }else{
+    render();
+    setTimeout(()=>aiTurn(S.turnIdx),900);
+  }
+}
+function drawTile(){
+  if(!S||S.over||!myTurn())return;
+  if(S.placed.size>0){toast('本轮已下牌，不能摸牌；请用「结束回合」或「重置本轮」');return;}
+  if(S.pool.length){me().rack.push(S.pool.pop());log('你摸了一张牌');}
+  else log('牌池已空，你过牌');
+  S.pass++;nextTurn();
+}
+function sortRack(){
+  if(!S||!myTurn()||S.over)return;
+  me().rack.sort((a,b)=>{
+    if(isJoker(a))return 1;if(isJoker(b))return -1;
+    const ci=COLORS.indexOf(a.color)-COLORS.indexOf(b.color);
+    return ci||a.num-b.num;
+  });
+  render();
+}
+
+function candidates(rack){
+  const out=[],seen=new Set();
+  const jokersW=rack.filter(t=>t.color==='jokerWarm');
+  const jokersC=rack.filter(t=>t.color==='jokerCold');
+  const allJokers=[...jokersW,...jokersC];
+  const push=tiles=>{
+    if(tiles.length>=3){
+      const key=tiles.map(t=>t.id).sort((a,b)=>a-b).join(',');
+      if(!seen.has(key)){seen.add(key);out.push({tiles,score:analyzeGroup(tiles).score});}
+    }
+  };
+  for(let n=1;n<=13;n++){
+    const by={};rack.forEach(t=>{if(t.num===n&&!isJoker(t))(by[t.color]??=[]).push(t);});
+    const cols=Object.keys(by);
+    for(let k=3;k<=4;k++){
+      if(cols.length>=k)combinations(cols,k).forEach(cs=>push(cs.map(c=>by[c][0])));
+    }
+    const miss=()=>COLORS.filter(c=>!cols.includes(c));
+    if(cols.length===3){
+      const m=miss()[0];
+      const j=allJokers.find(x=>JOKER_FAMILY[x.color].includes(m));
+      if(j)push([by[cols[0]][0],by[cols[1]][0],by[cols[2]][0],j]);
+    }
+    if(cols.length===2){
+      const m=miss();
+      const w=m.some(c=>JOKER_FAMILY.jokerWarm.includes(c))?jokersW[0]:null;
+      const cd=m.some(c=>JOKER_FAMILY.jokerCold.includes(c))?jokersC[0]:null;
+      if(w)push([by[cols[0]][0],by[cols[1]][0],w]);
+      if(cd)push([by[cols[0]][0],by[cols[1]][0],cd]);
+      if(w&&cd)push([by[cols[0]][0],by[cols[1]][0],w,cd]);
+    }
+    if(cols.length===1){
+      const m=miss();
+      if(jokersW.length&&jokersC.length
+        &&m.some(c=>JOKER_FAMILY.jokerWarm.includes(c))&&m.some(c=>JOKER_FAMILY.jokerCold.includes(c)))
+        push([by[cols[0]][0],jokersW[0],jokersC[0]]);
+    }
+  }
+  for(const color of COLORS){
+    const by={};rack.forEach(t=>{if(t.color===color&&t.num)(by[t.num]??=[]).push(t);});
+    const jok=allJokers.filter(j=>JOKER_FAMILY[j.color].includes(color));
+    for(let s=1;s<=11;s++){
+      const run=[];
+      for(let n=s;n<=13&&by[n]&&by[n].length;n++)run.push(by[n][0]);
+      for(let len=3;len<=run.length;len++)push(run.slice(0,len));
+    }
+    for(let s=1;s<=13;s++){
+      for(const jmax of [1,2].filter(x=>x<=jok.length)){
+        const run=[];let j=0;
+        for(let n=s;n<=13;n++){
+          if(by[n]&&by[n].length)run.push(by[n][0]);
+          else if(j<jmax){j++;run.push(jok[j-1]);}
+          else break;
+        }
+        for(let len=3;len<=run.length;len++)push(run.slice(0,len));
+      }
+    }
+  }
+  return out.filter(c=>c.score>0);
+}
+function jokerCount(tiles){return tiles.filter(isJoker).length;}
+
+function findInitialMeld(rack){
+  const cands=candidates(rack).sort((a,b)=>b.score-a.score||jokerCount(a.tiles)-jokerCount(b.tiles));
+  const used=new Set(),picked=[];let nodes=0;
+  function dfs(i,acc){
+    if(++nodes>50000)return false;
+    if(acc>=30)return true;
+    if(i>=cands.length)return false;
+    const c=cands[i];
+    if(c.tiles.every(t=>!used.has(t.id))){
+      c.tiles.forEach(t=>used.add(t.id));picked.push(c.tiles);
+      if(dfs(i+1,acc+c.score))return true;
+      picked.pop();c.tiles.forEach(t=>used.delete(t.id));
+    }
+    return dfs(i+1,acc);
+  }
+  return dfs(0,0)?picked:null;
+}
+function bestHandGroup(rack){
+  const cands=candidates(rack).sort((a,b)=>b.score-a.score||jokerCount(a.tiles)-jokerCount(b.tiles));
+  return cands[0]||null;
+}
+function removeFromRack(rack,tiles){
+  tiles.forEach(t=>{const i=rack.findIndex(x=>x.id===t.id);if(i>=0)rack.splice(i,1);});
+}
+
+function aiTurn(idx){
+  if(!S||S.over||S.turnIdx!==idx)return;
+  const p=S.players[idx];
+  let placed=false;
+  if(!p.melded){
+    const meld=findInitialMeld(p.rack);
+    if(meld&&meld.length){
+      meld.forEach(tiles=>{S.table.push({id:++GID,tiles});removeFromRack(p.rack,tiles);});
+      p.melded=true;placed=true;
+      const sc=meld.reduce((s,g)=>s+analyzeGroup(g).score,0);
+      log(`${p.name}破冰，下牌 ${sc} 分`);
+    }
+  }
+  if(p.melded){
+    let guard=0;
+    while(guard++<20&&p.rack.length>0){
+      const g=bestHandGroup(p.rack);
+      if(!g)break;
+      S.table.push({id:++GID,tiles:g.tiles});
+      removeFromRack(p.rack,g.tiles);
+      placed=true;
+      log(`${p.name}摆出一组 ${analyzeGroup(g.tiles).score} 分的牌`);
+    }
+    let again=true,g2=0;
+    while(again&&g2++<80&&p.rack.length>0){
+      again=false;
+      outer:
+      for(const t of [...p.rack]){
+        for(const g of S.table){
+          for(let pos=0;pos<=g.tiles.length;pos++){
+            g.tiles.splice(pos,0,t);
+            if(analyzeGroup(g.tiles).valid){
+              removeFromRack(p.rack,[t]);
+              placed=true;again=true;
+              log(`${p.name}往桌面牌组补了一张牌`);
+              break outer;
+            }
+            g.tiles.splice(pos,1);
+          }
+        }
+      }
+    }
+  }
+  if(p.rack.length===0){render();win(p);return;}
+  if(!placed){
+    if(S.pool.length){p.rack.push(S.pool.pop());log(`${p.name}摸了一张牌`);}
+    else log(`牌池已空，${p.name}过牌`);
+    S.pass++;
+  }else S.pass=0;
+  if(S.pool.length===0&&S.pass>=S.players.length){render();endByScore();return;}
+  nextTurn();
+}
+
+function rankingLines(){
+  return S.players
+    .map(p=>({p,s:rackScore(p.rack)}))
+    .sort((a,b)=>a.s-b.s)
+    .map((r,i)=>`${i+1}. ${r.p.name}：剩余 ${r.s} 分`);
+}
+function win(p){
+  S.over=true;
+  log(`${p.name}清空了牌架，获胜！`);
+  showOverlay(
+    p.human?'你赢了！':`${p.name}赢了`,
+    `${p.name}率先打完全部手牌。最终排名（剩余分值）：\n${rankingLines().join('\n')}`);
+  render();
+}
+function endByScore(){
+  S.over=true;
+  const ranked=S.players.map(p=>({p,s:rackScore(p.rack)})).sort((a,b)=>a.s-b.s);
+  log(`牌池已空且全员连续过牌，按剩余手牌计分：${ranked.map(r=>`${r.p.name} ${r.s} 分`).join(' / ')}`);
+  const champ=ranked[0],second=ranked[1];
+  let title,text;
+  if(ranked[0].s===ranked[ranked.length-1].s){title='平局';text=`全员剩余手牌同为 ${ranked[0].s} 分。`;}
+  else{
+    title=champ.p.human?'你赢了！':`${champ.p.name}赢了`;
+    text=`牌池已空，全员都无法出牌。${champ.p.name}以 ${champ.s} 分${champ.s===second.s?'（并列）':''}取胜。\n最终排名：\n${rankingLines().join('\n')}`;
+  }
+  showOverlay(title,text);
+  render();
+}
+function showOverlay(title,text){
+  el('#ovTitle').textContent=title;
+  el('#ovText').textContent=text;
+  el('#endOverlay').classList.remove('hidden');
+}
+
+let lastAiCount=3;
+function openSetup(){
+  el('#endOverlay').classList.add('hidden');
+  el('#setupOverlay').classList.remove('hidden');
+}
+els('#setupOverlay button[data-ai]').forEach(b=>{
+  b.addEventListener('click',()=>{
+    lastAiCount=+b.dataset.ai;
+    el('#setupOverlay').classList.add('hidden');
+    newGame(lastAiCount);
+  });
+});
+el('#btnNew').addEventListener('click',()=>{
+  if(S&&!S.over&&!confirm('当前对局尚未结束，确定重新开局吗？'))return;
+  openSetup();
+});
+el('#btnAgain').addEventListener('click',()=>{
+  el('#endOverlay').classList.add('hidden');
+  newGame(lastAiCount);
+});
+el('#btnAgainSetup').addEventListener('click',openSetup);
+el('#btnEnd').addEventListener('click',endTurn);
+el('#btnDraw').addEventListener('click',drawTile);
+el('#btnReset').addEventListener('click',resetTurn);
+el('#btnSort').addEventListener('click',sortRack);
+el('#btnRules').addEventListener('click',()=>el('#rulesModal').classList.remove('hidden'));
+el('#btnCloseRules').addEventListener('click',()=>el('#rulesModal').classList.add('hidden'));
+el('#rulesModal').addEventListener('click',e=>{if(e.target.id==='rulesModal')e.target.classList.add('hidden');});
+
+openSetup();
+</script>
+</body>
+</html>
